@@ -119,6 +119,8 @@ func (sw *StreamWriter) Write(buf *z.Buffer) error {
 		}
 		switch kv.Kind {
 		case pb.KV_DATA_KEY:
+			sw.writeLock.Lock()
+			defer sw.writeLock.Unlock()
 			y.AssertTrue(len(sw.db.opt.EncryptionKey) > 0)
 			var dk pb.DataKey
 			if err := proto.Unmarshal(kv.Value, &dk); err != nil {
@@ -136,6 +138,8 @@ func (sw *StreamWriter) Write(buf *z.Buffer) error {
 			}
 			return nil
 		case pb.KV_FILE:
+			sw.writeLock.Lock()
+			defer sw.writeLock.Unlock()
 			// All tables should be recieved before any of the keys.
 			if sw.processingKeys {
 				return errors.New("Received pb.KV_FILE after pb.KV_KEY")
@@ -169,12 +173,19 @@ func (sw *StreamWriter) Write(buf *z.Buffer) error {
 			// Pass. The following code will handle the keys.
 		}
 
+		sw.writeLock.Lock()
 		sw.processingKeys = true
+		if sw.maxVersion < kv.Version {
+			sw.maxVersion = kv.Version
+		}
 		if sw.prevLevel == 0 {
-			// If prevLevel is 0, that means that we have not written anything yet. Equivalently,
-			// we were virtually writing to the maxLevel+1.
+			// If prevLevel is 0, that means that we have not written anything yet.
+			// So, we can write to the maxLevel. newWriter writes to prevLevel - 1,
+			// so we can set prevLevel to len(levels).
 			sw.prevLevel = len(sw.db.lc.levels)
 		}
+		sw.writeLock.Unlock()
+
 		var meta, userMeta byte
 		if len(kv.Meta) > 0 {
 			meta = kv.Meta[0]
@@ -182,9 +193,7 @@ func (sw *StreamWriter) Write(buf *z.Buffer) error {
 		if len(kv.UserMeta) > 0 {
 			userMeta = kv.UserMeta[0]
 		}
-		if sw.maxVersion < kv.Version {
-			sw.maxVersion = kv.Version
-		}
+
 		e := &Entry{
 			Key:       y.KeyWithTs(kv.Key, kv.Version),
 			Value:     y.Copy(kv.Value),
