@@ -172,7 +172,7 @@ func (item *Item) yieldItemValue() ([]byte, func(), error) {
 	db := item.txn.db
 	result, cb, err := db.vlog.Read(vp, item.slice)
 	if err != nil {
-		log.Println(debug.Stack())
+		log.Println(string(debug.Stack()))
 		log.Println("A", db == nil)
 		log.Println("B", db.opt.Logger == nil)
 		log.Println("C", key == nil)
@@ -726,7 +726,7 @@ func (it *Iterator) fill(item *Item) {
 	item.val = nil
 	if it.opt.PrefetchValues {
 
-		log.Println(debug.Stack())
+		log.Println(string(debug.Stack()))
 
 		item.wg.Add(1)
 		go func() {
