@@ -20,7 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"hash/crc32"
+	"log"
 	"math"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -170,6 +172,12 @@ func (item *Item) yieldItemValue() ([]byte, func(), error) {
 	db := item.txn.db
 	result, cb, err := db.vlog.Read(vp, item.slice)
 	if err != nil {
+		log.Println(debug.Stack())
+		log.Println("A", db == nil)
+		log.Println("B", db.opt.Logger == nil)
+		log.Println("C", key == nil)
+		log.Println("D", item == nil)
+
 		db.opt.Logger.Errorf("Unable to read: Key: %v, Version : %v, meta: %v, userMeta: %v"+
 			" Error: %v", key, item.version, item.meta, item.userMeta, err)
 		var txn *Txn
@@ -717,6 +725,9 @@ func (it *Iterator) fill(item *Item) {
 	item.vptr = y.SafeCopy(item.vptr, vs.Value)
 	item.val = nil
 	if it.opt.PrefetchValues {
+
+		log.Println(debug.Stack())
+
 		item.wg.Add(1)
 		go func() {
 			// FIXME we are not handling errors here.
